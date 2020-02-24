@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8' />
+  <title>Demo App</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.js'></script>
+  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css' rel='stylesheet' />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 640px;
+      right: 0;
+    }
+    #count {
+      padding-left: 160px;
+      color: purple;
+      font-size: 190px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<img id="frame"></img>
+<p id="count"></p>
+<div id="map"></div>
+
+<script>
+mapboxgl.accessToken = "{{ token }}";
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/streets-v9?optimize=true',
+  center: [13.4, 52.51],
+  hash: true,
+  zoom: 17
+});
+
+//const endpoint = 'http://glados:5000';
+const endpoint = '';
+const frame = document.getElementById('frame');
+const count = document.getElementById('count');
+
+let pause = false;
+
+document.body.addEventListener('keydown', e => {
+  if (e.which == 32) {  // space bar
+    if (pause) { pause = false; } else { pause = true; }
+  }
+});
+
+fetch(endpoint + '/total')
+  .then(resp => resp.json())
+  .then(n => {
+
+    let i = 0;
+
+    setInterval(() => {
+      if (pause) { return; }
+
+      Promise.all([
+        fetch('/location/' + i.toString()),
+        fetch('/frame/' + i.toString()),
+      ]).then(resp => {
+        return Promise.all([
+          resp[0].json(),
+          resp[1].blob(),
+        ]);
+      }).then(resp => {
+        // someone switcha my lng-lat-ies !!
+        const lnglat = [resp[0][1], resp[0][0]];
+
+        new mapboxgl.Marker()
+          .setLngLat(lnglat)
+          .setPopup(new mapboxgl.Popup()
+          .setHTML('<img src=/frame/' + i + '></img>'))
+          .addTo(map);
+
+        map.easeTo({ 'center': lnglat, 'maxDuration': 500 });
+
+        frame.src = URL.createObjectURL(resp[1]);
+
+        count.textContent = i.toString();
+
+        if (i < n) { i += 1; } else { i = 0; }
+      });
+
+    }, 1000);
+  });
+</script>
+
+</body>
+</html>
